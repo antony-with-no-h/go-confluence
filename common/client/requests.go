@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/hexops/valast"
 	"github.com/spf13/viper"
 )
 
@@ -35,6 +34,8 @@ func Post(url string, body io.Reader, headers map[string]string) *http.Response 
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Printf("%+v\n", req)
 
 	for k, v := range headers {
 		req.Header.Add(k, v)
@@ -70,15 +71,12 @@ func PageExists(space string, title string) bool {
 	var body QueryBody
 	err = json.Unmarshal(b, &body)
 	if err != nil {
-		fmt.Println(valast.String(res.Request))
 		log.Fatal(err)
 	}
 
 	if body.Size > 0 {
 		return true
 	}
-
-	fmt.Println(valast.String(body))
 
 	return false
 }

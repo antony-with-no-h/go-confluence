@@ -2,6 +2,8 @@ module github.com/antony-with-no-h/go-confluence
 
 go 1.21.6
 
+require github.com/gomarkdown/markdown v0.0.0-20231222211730-1d6d20845b47
+
 require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect

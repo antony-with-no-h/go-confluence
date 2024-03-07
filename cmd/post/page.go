@@ -11,8 +11,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/antony-with-no-h/go-confluence/common/client"
+	convert_markdown "github.com/antony-with-no-h/go-confluence/convert-markdown"
 	"github.com/hexops/valast"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -20,9 +23,10 @@ import (
 
 // pageCmd represents the page command
 var (
-	tmplPath string
-	title    string
-	pageCmd  = &cobra.Command{
+	tmplPath  string
+	title     string
+	mdConvert bool
+	pageCmd   = &cobra.Command{
 		Use:   "page",
 		Short: "",
 		Long:  ``,
@@ -36,6 +40,7 @@ func init() {
 	PostCmd.AddCommand(pageCmd)
 	pageCmd.Flags().StringVarP(&tmplPath, "filename", "f", "", "")
 	pageCmd.Flags().StringVarP(&title, "title", "t", "", "")
+	pageCmd.Flags().BoolVar(&mdConvert, "md", false, "Treat source file as Markdown")
 }
 
 func postPage(cmd *cobra.Command, args []string) {
@@ -53,7 +58,12 @@ func postPage(cmd *cobra.Command, args []string) {
 		},
 	}
 
-	requestBody.SetStorage(filepath.Join(tmplPath))
+	file := filepath.Join(tmplPath)
+	if mdConvert {
+		requestBody.StorageFromMarkdown(file)
+	} else {
+		requestBody.SetStorage(file)
+	}
 
 	if pageExists := client.PageExists(requestBody.Space.Key, requestBody.Title); pageExists == true {
 		log.Printf("Page already exists")
@@ -61,7 +71,9 @@ func postPage(cmd *cobra.Command, args []string) {
 	}
 
 	bodyBuf := new(bytes.Buffer)
-	json.NewEncoder(bodyBuf).Encode(requestBody)
+	bodyBufEncoder := json.NewEncoder(&NewLineToBrWriter{bodyBuf})
+	bodyBufEncoder.SetEscapeHTML(false)
+	bodyBufEncoder.Encode(requestBody)
 
 	URL := client.MakeURL("/content", nil)
 	res := client.Post(URL,
@@ -71,12 +83,35 @@ func postPage(cmd *cobra.Command, args []string) {
 
 	defer res.Body.Close()
 	resBody, _ := io.ReadAll(res.Body)
+	if res.StatusCode > 299 {
+		var jsonErr ResponseError
+		json.Unmarshal(resBody, &jsonErr)
+
+		errJson, _ := json.MarshalIndent(jsonErr, "", "  ")
+		log.Fatalf("%s\n", errJson)
+	}
 
 	var jsonRes Response
 	json.Unmarshal(resBody, &jsonRes)
 
 	fmt.Println(valast.String(jsonRes))
 
+}
+
+type NewLineToBrWriter struct {
+	Writer io.Writer
+}
+
+func (w *NewLineToBrWriter) Write(p []byte) (n int, err error) {
+	re := regexp.MustCompile(`(?s)\[CDATA\[(.*?)]]|\\n`)
+	str := re.ReplaceAllStringFunc(string(p), func(match string) string {
+		if strings.HasPrefix(match, "[CDATA[") {
+			return match
+		}
+		return "<br/>"
+	})
+	//str := strings.Replace(string(p), `\n`, "<br/>", -1)
+	return w.Writer.Write([]byte(str))
 }
 
 type Data struct {
@@ -112,7 +147,28 @@ type Response struct {
 	Type  string `json:"type"`
 }
 
+type ResponseError struct {
+	StatusCode int `json:"statusCode"`
+	Data       struct {
+		Authorized            bool  `json:"authorized"`
+		Valid                 bool  `json:"valid"`
+		AllowedInReadOnlyMode bool  `json:"allowedInReadOnlyMode"`
+		Errors                []any `json:"errors"`
+		Successful            bool  `json:"successful"`
+	} `json:"data"`
+	Message string `json:"message"`
+	Reason  string `json:"reason"`
+}
+
 func (d *Data) SetStorage(file string) {
+	d.Body.Storage.Value = string(open(file))
+}
+
+func (d *Data) StorageFromMarkdown(file string) {
+	d.Body.Storage.Value = convert_markdown.RenderHTML(open(file))
+}
+
+func open(file string) []byte {
 	fd, err := os.Open(file)
 	if err != nil {
 		log.Fatal(err)
@@ -123,5 +179,5 @@ func (d *Data) SetStorage(file string) {
 		log.Fatal(err)
 	}
 
-	d.Body.Storage.Value = string(b)
+	return b
 }
