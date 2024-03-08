@@ -10,7 +10,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/antony-with-no-h/go-confluence/common/client"
+	"github.com/antony-with-no-h/go-confluence/client"
 	"github.com/spf13/cobra"
 )
 

@@ -3,14 +3,22 @@ package convert_markdown
 import (
 	"fmt"
 	"io"
+	"strings"
 
+	"github.com/antony-with-no-h/go-confluence/config"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/ast"
 	"github.com/gomarkdown/markdown/html"
 	"github.com/gomarkdown/markdown/parser"
 )
 
-func RenderHTML(b []byte) string {
+type Macro struct {
+	Theme       string
+	Linenumbers bool
+	Collapse    bool
+}
+
+func RenderHTML(b []byte, cfg config.Config) string {
 
 	exts := parser.CommonExtensions | parser.HardLineBreak
 	p := parser.NewWithExtensions(exts)
@@ -18,19 +26,56 @@ func RenderHTML(b []byte) string {
 	doc := p.Parse(b)
 
 	htmlFlags := html.CommonFlags
-	opts := html.RendererOptions{Flags: htmlFlags, RenderNodeHook: hook}
+	opts := html.RendererOptions{
+		Flags:          htmlFlags,
+		RenderNodeHook: hook(cfg),
+	}
 	rend := html.NewRenderer(opts)
+
+	//fmt.Printf("%s\n", markdown.Render(doc, rend))
 
 	return fmt.Sprintf("%s", markdown.Render(doc, rend))
 }
 
-func hook(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
-	if codeBlock, ok := node.(*ast.CodeBlock); ok {
-		confluenceCodeBlock(w, codeBlock, entering)
-		return ast.GoToNext, true
+func hook(mTheme config.Config) html.RenderNodeFunc {
+	return func(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
+		//<ac:parameter ac:name=\"theme\">Confluence</ac:parameter>
+		//<ac:parameter ac:name="title">bob</ac:parameter>
+		//<ac:parameter ac:name="linenumbers">true</ac:parameter>
+
+		if codeBlock, ok := node.(*ast.CodeBlock); ok {
+			if entering {
+				block := []string{
+					"<ac:structured-macro ac:name=\"code\" ac:schema-version=\"1\">",
+					fmt.Sprintf("<ac:parameter ac:name=\"language\">%s</ac:parameter>", theme(codeBlock)),
+				}
+
+				for k, v := range mTheme.CodeMacro {
+					block = append(block,
+						fmt.Sprintf("<ac:parameter ac:name=\"%s\">%s</ac:parameter>", k, v))
+				}
+
+				block = append(block,
+					fmt.Sprintf("<ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>", codeBlock.Literal))
+
+				io.WriteString(w, strings.Join(block, ""))
+			}
+
+			return ast.GoToNext, true
+		}
+		return ast.GoToNext, false
 	}
-	return ast.GoToNext, false
 }
+
+//func hook(theme *Macro) html.RenderNodeFunc {
+//	return makeHook(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
+//		if codeBlock, ok := node.(*ast.CodeBlock); ok {
+//			confluenceCodeBlock(w, codeBlock, entering)
+//			return ast.GoToNext, true
+//		}
+//		return ast.GoToNext, false
+//	}
+//}
 
 func confluenceCodeBlock(w io.Writer, c *ast.CodeBlock, entering bool) {
 	if entering {

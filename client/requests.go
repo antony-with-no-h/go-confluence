@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/spf13/viper"
+	"github.com/antony-with-no-h/go-confluence/config"
 )
 
 func Get(url string, headers map[string]string) *http.Response {
@@ -35,8 +35,6 @@ func Post(url string, body io.Reader, headers map[string]string) *http.Response 
 		log.Fatal(err)
 	}
 
-	fmt.Printf("%+v\n", req)
-
 	for k, v := range headers {
 		req.Header.Add(k, v)
 	}
@@ -50,6 +48,8 @@ func Post(url string, body io.Reader, headers map[string]string) *http.Response 
 }
 
 func PageExists(space string, title string) bool {
+	cfg, _ := config.LoadConfig()
+
 	query := make(map[string]string)
 	query["spaceKey"] = space
 	query["title"] = title
@@ -57,7 +57,7 @@ func PageExists(space string, title string) bool {
 	endpoint := MakeURL("/content", query)
 
 	headers := make(map[string]string)
-	headers["Authorization"] = viper.GetString("AccessToken")
+	headers["Authorization"] = cfg.AccessToken
 	headers["Content-Type"] = "application/json"
 
 	res := Get(endpoint, headers)
@@ -82,15 +82,17 @@ func PageExists(space string, title string) bool {
 }
 
 func DefaultHeaders() map[string]string {
+	cfg, _ := config.LoadConfig()
 	headers := make(map[string]string)
-	headers["Authorization"] = viper.GetString("AccessToken")
+	headers["Authorization"] = cfg.AccessToken
 	headers["Content-Type"] = "application/json"
 
 	return headers
 }
 
 func MakeURL(path string, query map[string]string) string {
-	ApiEndpoint, _ := url.Parse(viper.GetString("Target"))
+	cfg, _ := config.LoadConfig()
+	ApiEndpoint, _ := url.Parse(cfg.Target)
 	ApiEndpoint = ApiEndpoint.JoinPath(path)
 
 	q := ApiEndpoint.Query()

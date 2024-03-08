@@ -14,11 +14,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/antony-with-no-h/go-confluence/common/client"
+	"github.com/antony-with-no-h/go-confluence/client"
+	"github.com/antony-with-no-h/go-confluence/config"
 	convert_markdown "github.com/antony-with-no-h/go-confluence/convert-markdown"
 	"github.com/hexops/valast"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // pageCmd represents the page command
@@ -45,11 +45,16 @@ func init() {
 
 func postPage(cmd *cobra.Command, args []string) {
 
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	requestBody := &Data{
 		Type:  "page",
 		Title: title,
 		Space: Space{
-			Key: viper.GetString("space"),
+			Key: PostCmd.PersistentFlags().Lookup("space").Value.String(),
 		},
 		Body: Body{
 			Storage{
@@ -60,7 +65,7 @@ func postPage(cmd *cobra.Command, args []string) {
 
 	file := filepath.Join(tmplPath)
 	if mdConvert {
-		requestBody.StorageFromMarkdown(file)
+		requestBody.StorageFromMarkdown(file, cfg)
 	} else {
 		requestBody.SetStorage(file)
 	}
@@ -164,8 +169,8 @@ func (d *Data) SetStorage(file string) {
 	d.Body.Storage.Value = string(open(file))
 }
 
-func (d *Data) StorageFromMarkdown(file string) {
-	d.Body.Storage.Value = convert_markdown.RenderHTML(open(file))
+func (d *Data) StorageFromMarkdown(file string, cfg config.Config) {
+	d.Body.Storage.Value = convert_markdown.RenderHTML(open(file), cfg)
 }
 
 func open(file string) []byte {

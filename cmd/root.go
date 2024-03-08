@@ -4,14 +4,11 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/antony-with-no-h/go-confluence/cmd/get"
 	"github.com/antony-with-no-h/go-confluence/cmd/post"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -36,7 +33,7 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
+	//cobra.OnInitialize(initConfig)
 
 	//rootCmd.PersistentFlags().String("space", "", "Confluence space name (QA, HR, Engineering etc)")
 	//rootCmd.MarkPersistentFlagRequired("space")
@@ -46,6 +43,7 @@ func init() {
 	rootCmd.AddCommand(post.PostCmd)
 }
 
+/*
 func initConfig() {
 
 	var configPath string
@@ -62,4 +60,6 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		fmt.Printf("Error reading config: %s\n", err)
 	}
+
 }
+*/
