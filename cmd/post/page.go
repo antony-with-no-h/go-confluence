@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
+	"slices"
 
 	"github.com/antony-with-no-h/go-confluence/client"
 	"github.com/antony-with-no-h/go-confluence/config"
@@ -39,7 +39,6 @@ var (
 func init() {
 	PostCmd.AddCommand(pageCmd)
 	pageCmd.Flags().StringVarP(&tmplPath, "filename", "f", "", "")
-	pageCmd.Flags().StringVarP(&title, "title", "t", "", "")
 	pageCmd.Flags().BoolVar(&mdConvert, "md", false, "Treat source file as Markdown")
 }
 
@@ -52,7 +51,7 @@ func postPage(cmd *cobra.Command, args []string) {
 
 	requestBody := &Data{
 		Type:  "page",
-		Title: title,
+		Title: PostCmd.PersistentFlags().Lookup("title").Value.String(),
 		Space: Space{
 			Key: PostCmd.PersistentFlags().Lookup("space").Value.String(),
 		},
@@ -79,6 +78,8 @@ func postPage(cmd *cobra.Command, args []string) {
 	bodyBufEncoder := json.NewEncoder(&NewLineToBrWriter{bodyBuf})
 	bodyBufEncoder.SetEscapeHTML(false)
 	bodyBufEncoder.Encode(requestBody)
+
+	fmt.Println(valast.String(requestBody))
 
 	URL := client.MakeURL("/content", nil)
 	res := client.Post(URL,
@@ -107,23 +108,48 @@ type NewLineToBrWriter struct {
 	Writer io.Writer
 }
 
-func (w *NewLineToBrWriter) Write(p []byte) (n int, err error) {
-	re := regexp.MustCompile(`(?s)\[CDATA\[(.*?)]]|\\n`)
-	str := re.ReplaceAllStringFunc(string(p), func(match string) string {
-		if strings.HasPrefix(match, "[CDATA[") {
-			return match
+func (w *NewLineToBrWriter) Write(data []byte) (n int, err error) {
+
+	fmt.Printf("Received == %T\n\n", data)
+	pattern := `(?sU)<ac:structured-macro.*</ac:structured-macro>`
+	newlinePos := tagStartEnd(data, pattern)
+
+	var modified []byte
+	for idx, bit := range data {
+		if _, found := slices.BinarySearch(newlinePos, idx); found {
+			modified = append(modified, bit)
+		} else if string(bit) == "\n" {
+			modified = append(modified, []byte("<br/>")...)
+		} else {
+			modified = append(modified, bit)
 		}
-		return "<br/>"
-	})
-	//str := strings.Replace(string(p), `\n`, "<br/>", -1)
-	return w.Writer.Write([]byte(str))
+	}
+
+	return w.Writer.Write(modified)
+}
+
+func tagStartEnd(data []byte, pattern string) []int {
+	re := regexp.MustCompile(pattern)
+	matches := re.FindAllIndex(data, -1)
+
+	var pos []int
+	for _, match := range matches {
+		start, stop := match[0], match[1]
+		for i := start; i <= stop; i++ {
+			pos = append(pos, i)
+		}
+	}
+
+	return pos
 }
 
 type Data struct {
-	Type  string `json:"type"`
-	Title string `json:"title"`
-	Space `json:"space"`
-	Body  `json:"body"`
+	ID      string `json:"id,omitempty"`
+	Type    string `json:"type"`
+	Title   string `json:"title"`
+	Space   `json:"space"`
+	Body    `json:"body"`
+	Version `json:"version,omitempty"`
 }
 
 type Body struct {
@@ -170,7 +196,9 @@ func (d *Data) SetStorage(file string) {
 }
 
 func (d *Data) StorageFromMarkdown(file string, cfg config.Config) {
-	d.Body.Storage.Value = convert_markdown.RenderHTML(open(file), cfg)
+	str, _ := convert_markdown.RenderHTML(open(file), cfg)
+
+	d.Body.Storage.Value = str
 }
 
 func open(file string) []byte {

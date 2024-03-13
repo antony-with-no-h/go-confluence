@@ -21,6 +21,12 @@ var (
 )
 
 func init() {
-	PostCmd.PersistentFlags().String("space", "", "Confluence space name (QA, HR, Engineering etc)")
+	PostCmd.PersistentFlags().StringP("space", "s", "",
+		"Confluence space name (QA, HR, Engineering etc)")
+	PostCmd.PersistentFlags().StringP("title", "t", "",
+		"Page title")
+	PostCmd.PersistentFlags().StringP("file", "f", "",
+		"Path to file containing page contents")
+
 	PostCmd.MarkPersistentFlagRequired("space")
 }

@@ -1,8 +1,10 @@
 package convert_markdown
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/antony-with-no-h/go-confluence/config"
@@ -12,53 +14,36 @@ import (
 	"github.com/gomarkdown/markdown/parser"
 )
 
-type Macro struct {
-	Theme       string
-	Linenumbers bool
-	Collapse    bool
-}
-
-func RenderHTML(b []byte, cfg config.Config) string {
-
-	exts := parser.CommonExtensions | parser.HardLineBreak
+func RenderHTML(b []byte, cfg config.Config) (string, []byte) {
+	exts := parser.CommonExtensions
 	p := parser.NewWithExtensions(exts)
+	p.Opts.ParserHook = parserNoteHook
 
 	doc := p.Parse(b)
 
-	htmlFlags := html.CommonFlags
+	htmlFlags := html.UseXHTML
 	opts := html.RendererOptions{
 		Flags:          htmlFlags,
 		RenderNodeHook: hook(cfg),
 	}
 	rend := html.NewRenderer(opts)
 
-	//fmt.Printf("%s\n", markdown.Render(doc, rend))
-
-	return fmt.Sprintf("%s", markdown.Render(doc, rend))
+	return fmt.Sprintf("%s", markdown.Render(doc, rend)), markdown.Render(doc, rend)
 }
 
-func hook(mTheme config.Config) html.RenderNodeFunc {
+func hook(cfg config.Config) html.RenderNodeFunc {
 	return func(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
-		//<ac:parameter ac:name=\"theme\">Confluence</ac:parameter>
-		//<ac:parameter ac:name="title">bob</ac:parameter>
-		//<ac:parameter ac:name="linenumbers">true</ac:parameter>
-
 		if codeBlock, ok := node.(*ast.CodeBlock); ok {
 			if entering {
-				block := []string{
-					"<ac:structured-macro ac:name=\"code\" ac:schema-version=\"1\">",
-					fmt.Sprintf("<ac:parameter ac:name=\"language\">%s</ac:parameter>", theme(codeBlock)),
-				}
+				code(cfg, w, codeBlock)
+			}
 
-				for k, v := range mTheme.CodeMacro {
-					block = append(block,
-						fmt.Sprintf("<ac:parameter ac:name=\"%s\">%s</ac:parameter>", k, v))
-				}
+			return ast.GoToNext, true
+		}
 
-				block = append(block,
-					fmt.Sprintf("<ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>", codeBlock.Literal))
-
-				io.WriteString(w, strings.Join(block, ""))
+		if noteBlock, ok := node.(*Note); ok {
+			if entering {
+				note(cfg, w, noteBlock)
 			}
 
 			return ast.GoToNext, true
@@ -67,22 +52,37 @@ func hook(mTheme config.Config) html.RenderNodeFunc {
 	}
 }
 
-//func hook(theme *Macro) html.RenderNodeFunc {
-//	return makeHook(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
-//		if codeBlock, ok := node.(*ast.CodeBlock); ok {
-//			confluenceCodeBlock(w, codeBlock, entering)
-//			return ast.GoToNext, true
-//		}
-//		return ast.GoToNext, false
-//	}
-//}
-
-func confluenceCodeBlock(w io.Writer, c *ast.CodeBlock, entering bool) {
-	if entering {
-		io.WriteString(w, fmt.Sprintf(`<ac:structured-macro ac:name="code" ac:schema-version="1">
-<ac:parameter ac:name="language">%s</ac:parameter>
-<ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>`, theme(c), c.Literal))
+func code(cfg config.Config, w io.Writer, node *ast.CodeBlock) {
+	block := []string{
+		"<ac:structured-macro ac:name=\"code\" ac:schema-version=\"1\">",
+		fmt.Sprintf("<ac:parameter ac:name=\"language\">%s</ac:parameter>", theme(node)),
 	}
+
+	for k, v := range cfg.CodeMacro {
+		block = append(block,
+			fmt.Sprintf("<ac:parameter ac:name=\"%s\">%s</ac:parameter>", k, v))
+	}
+
+	block = append(block,
+		fmt.Sprintf("<ac:plain-text-body><![CDATA[%s]]></ac:plain-text-body></ac:structured-macro>", node.Literal))
+
+	io.WriteString(w, strings.Join(block, ""))
+}
+
+func note(cfg config.Config, w io.Writer, node *Note) {
+	var body []string
+	re := regexp.MustCompile(`^\s{3,}`)
+
+	//for _, line := range bytes.SplitAfterN(node.Notes, []byte("\n"), 1) {
+	for _, line := range bytes.Split(node.Notes, []byte("\n")) {
+		if len(line) == 0 {
+			continue
+		}
+		body = append(body, string(re.ReplaceAll(line, []byte(""))))
+	}
+
+	io.WriteString(w, fmt.Sprintf(`<ac:structured-macro ac:name="%s" ac:schema-version="1">                            
+<ac:rich-text-body>%s</ac:rich-text-body></ac:structured-macro>`, string(node.Type), strings.Join(body, "\n")))
 }
 
 func theme(c *ast.CodeBlock) string {

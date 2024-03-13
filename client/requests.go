@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/antony-with-no-h/go-confluence/config"
 )
@@ -107,11 +108,42 @@ func MakeURL(path string, query map[string]string) string {
 
 type QueryBody struct {
 	Results []struct {
-		ID     string `json:"id"`
-		Type   string `json:"type"`
-		Status string `json:"status"`
-		Title  string `json:"title"`
-		Links  struct {
+		ID      string `json:"id"`
+		Type    string `json:"type"`
+		Status  string `json:"status"`
+		Title   string `json:"title"`
+		Version struct {
+			By struct {
+				Type           string `json:"type"`
+				Username       string `json:"username"`
+				UserKey        string `json:"userKey"`
+				ProfilePicture struct {
+					Path      string `json:"path"`
+					Width     int    `json:"width"`
+					Height    int    `json:"height"`
+					IsDefault bool   `json:"isDefault"`
+				} `json:"profilePicture"`
+				DisplayName string `json:"displayName"`
+				Links       struct {
+					Self string `json:"self"`
+				} `json:"_links"`
+				Expandable struct {
+					Status string `json:"status"`
+				} `json:"_expandable"`
+			} `json:"by"`
+			When      time.Time `json:"when"`
+			Message   string    `json:"message"`
+			Number    int       `json:"number"`
+			MinorEdit bool      `json:"minorEdit"`
+			Hidden    bool      `json:"hidden"`
+			Links     struct {
+				Self string `json:"self"`
+			} `json:"_links"`
+			Expandable struct {
+				Content string `json:"content"`
+			} `json:"_expandable"`
+		} `json:"version,omitempty"`
+		Links struct {
 			Webui  string `json:"webui"`
 			Edit   string `json:"edit"`
 			Tinyui string `json:"tinyui"`
