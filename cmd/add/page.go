@@ -14,7 +14,7 @@ var (
 	addCmd = &cobra.Command{
 		Use:   "page",
 		Short: "",
-		Long:  ``,
+		Long:  `Publish a new page.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			AddPage(cmd)
 		},

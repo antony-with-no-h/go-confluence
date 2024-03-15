@@ -1,69 +1,49 @@
 # go-confluence
 
-CLI to:
-
-- Publish a file containing Confluence XHTML to a Confluence instance.
-- Convert and publish a Markdown file to Confluence.
-
-This project was created to strength my knowledge of Go, Go tooling: Cobra & Viper. And migrate some Python scripts to Go. The Markdown to XHTML conversion doesn't account for all available Confluence macros.
-
-## Installation
-
-If you have Go installed
-
-```
-go build
-```
-
-Create a file named `config` in `$XDG_CONFIG_HOME/go-confluence`. The path to search is setup using [UserConfigDir](https://pkg.go.dev/os#UserConfigDir).
-
-Contents of the file should be:
-
-```
-AccessToken: Bearer 
-Target: https://
-CodeMacro:
-  linenumbers: "true"
-  theme: confluence
-```
-
-`AccessToken` is a [Confluence PAT](https://confluence.atlassian.com/enterprise/using-personal-access-tokens-1026032365.html) 
-
-`CodeMacro` controls how all code macros will be themed and if to display line numbers.
+Convert and publish Markdown to Confluence.
 
 ## Usage
 
-Commands currently implemented
-
-- get
-- post
-
-### get [command]
-
-Really a dummy function that I used to get going with Cobra. Can do some basic querying against the `/content` endpoint.
-
 ```
-# unfiltered query
-go-confluence get content
+Usage:
+  go-confluence [command]
 
-# add query strings
-go-confluence get content spaceKey=engineering title="How-to guides"
-```
+Available Commands:
+  add         
+  completion  Generate the autocompletion script for the specified shell
+  edit        
+  help        Help about any command
 
-### post [command]
+Flags:
+  -f, --file string     Path to file containing Page Markdown
+  -h, --help            help for go-confluence
+  -p, --parent string   Title of the page that will act as the parent (e.g. Support, Backup and Restore)
+  -s, --space string    The Confluence space where the page should be published (e.g. Engineering, QA)
+  -t, --title string    Page title
 
-From a file already written in Confluence XHTML
-
-```
-go-confluence add page --space <space> \
-    --filename /home/user/wiki/template.txt \
-    --title <title>
+Use "go-confluence [command] --help" for more information about a command.
 ```
 
-Convert a Markdown file and publish
+### Examples
+
+Publish a page titled *How-to Guides* in the Engineering space.
 
 ```
-go-confluence add page --space <space> \
-    --filename /home/user/wiki/template.md \
-    --title <title> --md
+go-confluence add page \
+    -s Engineering -t "How-to Guides" -f ./wiki/how_to_guides.md
+```
+
+Add a page nested under *How-to Guides* 
+
+```
+go-confluence add page \
+    -s Engineering -p "How-to Guides" -t "Restore Database from Backup" \
+    -f ./wiki/restore_database.md
+```
+
+Update the page
+
+```
+go-confluence edit page \
+    -s Engineering -t "Restore Database from Backup" -f ./wiki/restore_database.md
 ```

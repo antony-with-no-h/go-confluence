@@ -24,10 +24,10 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringP("space", "s", "", "")
-	RootCmd.PersistentFlags().StringP("title", "t", "", "")
-	RootCmd.PersistentFlags().StringP("file", "f", "", "")
-	RootCmd.PersistentFlags().StringP("parent", "p", "", "")
+	RootCmd.PersistentFlags().StringP("space", "s", "", "The Confluence space where the page should be published (e.g. Engineering, QA)")
+	RootCmd.PersistentFlags().StringP("title", "t", "", "Page title")
+	RootCmd.PersistentFlags().StringP("file", "f", "", "Path to file containing Page Markdown")
+	RootCmd.PersistentFlags().StringP("parent", "p", "", "Title of the page that will act as the parent (e.g. Support, Backup and Restore)")
 
 	RootCmd.AddCommand(edit.EditCmd)
 	RootCmd.AddCommand(add.AddCmd)

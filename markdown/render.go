@@ -33,7 +33,7 @@ func (d *Document) Write(w io.Writer) {
 
 func RenderHTML(data []byte) string {
 	cfg, _ := config.LoadConfig()
-	exts := parser.CommonExtensions | parser.HardLineBreak
+	exts := parser.CommonExtensions | parser.HardLineBreak | parser.SuperSubscript
 	p := parser.NewWithExtensions(exts)
 	p.Opts.ParserHook = parserNoteHook
 
