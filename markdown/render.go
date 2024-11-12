@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 
@@ -25,6 +26,11 @@ type Document struct {
 	Render []byte
 }
 
+type Metadata struct {
+	ast.Leaf
+	Title []byte
+}
+
 func (d *Document) Write(w io.Writer) {
 	//re := regexp.MustCompile(`(?m)^\n*$`)
 	//w.Write(re.ReplaceAll(d.Render, []byte("<br class=\"atl-forced-newline\" />")))
@@ -35,14 +41,14 @@ func RenderHTML(data []byte) string {
 	cfg, _ := config.LoadConfig()
 	exts := parser.CommonExtensions | parser.HardLineBreak | parser.SuperSubscript
 	p := parser.NewWithExtensions(exts)
-	p.Opts.ParserHook = parserNoteHook
+	p.Opts.ParserHook = ParserHook
 
 	doc := p.Parse(data)
 
 	htmlFlags := html.UseXHTML
 	opts := html.RendererOptions{
 		Flags:          htmlFlags,
-		RenderNodeHook: hook(cfg),
+		RenderNodeHook: RenderHook(cfg),
 	}
 	rend := html.NewRenderer(opts)
 
@@ -55,24 +61,20 @@ func RenderHTML(data []byte) string {
 	return buf.String()
 }
 
-func hook(cfg config.Config) html.RenderNodeFunc {
+func RenderHook(cfg config.Config) html.RenderNodeFunc {
 	return func(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
-		if codeBlock, ok := node.(*ast.CodeBlock); ok {
-			if entering {
-				code(cfg, w, codeBlock)
-			}
-
+		switch blockType := node.(type) {
+		case *ast.CodeBlock:
+			code(cfg, w, blockType)
 			return ast.GoToNext, true
-		}
-
-		if noteBlock, ok := node.(*Note); ok {
-			if entering {
-				note(cfg, w, noteBlock)
-			}
-
+		case *Note:
+			note(cfg, w, blockType)
 			return ast.GoToNext, true
+		case *Metadata:
+			return ast.GoToNext, true
+		default:
+			return ast.GoToNext, false
 		}
-		return ast.GoToNext, false
 	}
 }
 
@@ -191,10 +193,15 @@ func theme(c *ast.CodeBlock) string {
 	return "text"
 }
 
-func parserNoteHook(data []byte) (ast.Node, []byte, int) {
+func ParserHook(data []byte) (ast.Node, []byte, int) {
 	if node, d, n := parserNote(data); node != nil {
 		return node, d, n
 	}
+
+	if node, d, n := parserMetadata(data); node != nil {
+		return node, d, n
+	}
+
 	return nil, nil, 0
 }
 
@@ -214,10 +221,63 @@ func parserNote(data []byte) (ast.Node, []byte, int) {
 	macroTitle := bytes.ReplaceAll(re.Find(fence), []byte("\""), []byte(""))
 
 	node := &Note{
+		Leaf: ast.Leaf{
+			Literal: block,
+		},
 		Notes: text,
 		Type:  macroType,
 		Title: macroTitle,
 	}
 
 	return node, nil, len(block)
+}
+
+func parserMetadata(data []byte) (ast.Node, []byte, int) {
+	if !bytes.HasPrefix(data, []byte("---")) {
+		return nil, nil, 0
+	}
+
+	re := regexp.MustCompile("(?m)^-{3}$")
+	blockStartStop := re.FindAllIndex(data, -1)
+
+	if len(blockStartStop) != 2 {
+		fmt.Println("Cannot process page metadata")
+		os.Exit(1)
+	}
+
+	leaf := &ast.Leaf{
+		Literal: data[:blockStartStop[1][1]],
+	}
+
+	var metadata Metadata
+	metadata.Leaf = *leaf
+
+	contentStart := blockStartStop[0][1]
+	contentStop := blockStartStop[1][0]
+
+	content := data[contentStart:contentStop]
+
+	for _, line := range bytes.Split(content, []byte("\n")) {
+		kvPair := bytes.Split(line, []byte(":"))
+		if len(kvPair) == 1 {
+			continue
+		}
+
+		key := kvPair[0]
+		value := kvPair[1]
+
+		if len(kvPair) != 2 {
+			fmt.Println("Error processing metadata key-values")
+			os.Exit(1)
+		}
+
+		// TODO: emit info/warning if key is not implemented
+		if fmt.Sprintf("%s", bytes.ToLower(key)) == "title" {
+			metadata.Title = bytes.TrimPrefix(value, []byte(" "))
+		}
+
+	}
+
+	return &metadata, nil, blockStartStop[1][1]
+
 }

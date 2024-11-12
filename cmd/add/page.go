@@ -1,3 +1,5 @@
+//go:build exclude
+
 package add
 
 import (
@@ -8,17 +10,6 @@ import (
 
 	"github.com/antony-with-no-h/go-confluence/requests"
 	"github.com/spf13/cobra"
-)
-
-var (
-	addCmd = &cobra.Command{
-		Use:   "page",
-		Short: "",
-		Long:  `Publish a new page.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			AddPage(cmd)
-		},
-	}
 )
 
 func AddPage(cmd *cobra.Command) {

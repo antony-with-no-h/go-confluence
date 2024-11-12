@@ -5,8 +5,11 @@ import (
 )
 
 var (
-	flagSpace, flagTitle, flagFile string
-	EditCmd                        = &cobra.Command{
+	flagSpace string
+	flagTitle string
+	flagFile  string
+	flagXML   bool
+	EditCmd   = &cobra.Command{
 		Use:   "edit",
 		Short: "",
 		Long:  ``,

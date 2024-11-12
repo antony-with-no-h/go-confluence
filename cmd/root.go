@@ -10,9 +10,10 @@ import (
 
 var (
 	RootCmd = &cobra.Command{
-		Use:   "go-confluence",
-		Short: "",
-		Long:  ``,
+		Use:              "go-confluence",
+		Short:            "",
+		Long:             ``,
+		TraverseChildren: true,
 	}
 )
 
@@ -28,7 +29,9 @@ func init() {
 	RootCmd.PersistentFlags().StringP("title", "t", "", "Page title")
 	RootCmd.PersistentFlags().StringP("file", "f", "", "Path to file containing Page Markdown")
 	RootCmd.PersistentFlags().StringP("parent", "p", "", "Title of the page that will act as the parent (e.g. Support, Backup and Restore)")
+	RootCmd.PersistentFlags().Bool("xml", false, "<file> is Confluence XML, do not convert")
 
 	RootCmd.AddCommand(edit.EditCmd)
 	RootCmd.AddCommand(add.AddCmd)
+	RootCmd.AddCommand(dryRunCmd)
 }
